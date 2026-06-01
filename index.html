@@ -196,6 +196,26 @@ tr:hover td{background:var(--card2)}
 
     <div class="sset"><h3>📋 Wochenplan-Vorlage</h3><p>Hinweg ist immer Z2. Diese Einstellungen gelten für den Rückweg.</p><div id="planEd"></div><button class="btn bp bsm" onclick="savePlan()" style="margin-top:10px">Speichern</button></div>
 
+    <div class="sset"><h3>🏋 Eigene Trainingstypen</h3>
+      <p>Definiere neue Intervallformate – z.B. härtere Einheiten, Schwellentraining oder neue Workout-Strukturen. Eigene Typen erscheinen im Wochenplan und beim Eintragen von Sessions.</p>
+      <div id="ctypeList" style="margin-bottom:10px"></div>
+      <div id="ctypeForm" style="display:none;background:var(--card2);border-radius:10px;padding:12px;margin-bottom:10px">
+        <div class="fr">
+          <div class="fg"><label>Emoji</label><input id="ct_emoji" placeholder="🔥" maxlength="4" style="font-size:1.3rem;text-align:center;width:100%"></div>
+          <div class="fg"><label>Name</label><input id="ct_name" placeholder="z.B. 5×5 min Z4+"></div>
+        </div>
+        <div class="fr">
+          <div class="fg"><label>Farbe</label><input type="color" id="ct_color" value="#ef4444" style="width:100%;height:38px;padding:3px 6px;border-radius:8px;border:1px solid var(--border);background:var(--card2);cursor:pointer"></div>
+          <div class="fg"><label>Beschreibung (optional)</label><input id="ct_desc" placeholder="z.B. Rückweg: 5×5 min Z4+, 3 min locker"></div>
+        </div>
+        <div class="brow">
+          <button class="btn bs bsm" onclick="hideCtypeForm()">Abbrechen</button>
+          <button class="btn bp bsm" onclick="saveCtype()">Speichern</button>
+        </div>
+      </div>
+      <button class="btn bp bsm" id="ctypeAddBtn" onclick="showCtypeForm()">+ Neuer Typ</button>
+    </div>
+
     <div class="sset"><h3>🚴 Fahrräder</h3>
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>Fahrrad 1</label><input id="b1n" value="Tracking-Bike"></div>
@@ -237,7 +257,7 @@ tr:hover td{background:var(--card2)}
     <div class="fg"><label>Richtung</label><select id="mDir"><option value="Hinweg">Hinweg</option><option value="Rückweg" selected>Rückweg</option><option value="Gesamt">Gesamt (H+R)</option></select></div></div>
   <div class="fr">
     <div class="fg"><label>Fahrrad</label><select id="mBike"><option value="b1">🚴 Tracking-Bike</option><option value="b2">🪨 Gravelbike</option></select></div>
-    <div class="fg"><label>Trainingstyp</label><select id="mType"><option value="z2">🟢 Z2 Locker</option><option value="intervals_z3z4">🟡 4×6 Z3–Z4</option><option value="intervals_z4">🔴 2×10 Z4</option><option value="rest">😴 Ruhetag</option><option value="other">🚴 Sonstiges</option></select></div>
+    <div class="fg"><label>Trainingstyp</label><select id="mType"></select></div>
   </div>
   <div class="fr"><div class="fg"><label>Dauer (mm:ss)</label><input type="text" id="mDur" placeholder="55:16"></div>
     <div class="fg"><label>Distanz (km)</label><input type="number" id="mDist" step="0.01" placeholder="23.05"></div></div>
@@ -274,10 +294,12 @@ const TT={
 const DN=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 const MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const BC={b1:'#5c8eff',b2:'#34d058'};
+function getType(k){return TT[k]||(S.customTypes&&S.customTypes[k])||TT.other}
+function allTypes(){return Object.assign({},TT,S.customTypes||{})}
 
 let S={plan:{0:'rest',1:'rest',2:'z2',3:'z2',4:'intervals_z3z4',5:'intervals_z4',6:'rest'},
   bikes:{b1:'Tracking-Bike',b2:'Gravelbike'},hrMin:80,hrMax:195,sessions:[],deleted:[],updatedAt:'',
-  gistToken:'',gistId:''};
+  gistToken:'',gistId:'',customTypes:{}};
 let wkOff=0,editId=null,tmpGPX=null,statPeriod='week',dirHandle=null,asPending=false,curSessId=null,overlays={speed:false,alt:false},pushTimer=null;
 
 // ===== STORAGE =====
@@ -321,14 +343,14 @@ function renderWeek(){
   const g=document.getElementById('wgrid');g.innerHTML='';
   [1,2,3,4,5,6,0].forEach((dow,i)=>{
     const d=new Date(mon);d.setDate(mon.getDate()+i);
-    const ds=fmt(d),isToday=ds===fmt(today),pt=S.plan[dow]||'rest',tt=TT[pt];
+    const ds=fmt(d),isToday=ds===fmt(today),pt=S.plan[dow]||'rest',tt=getType(pt);
     const sess=S.sessions.filter(s=>s.date===ds);
     const c=document.createElement('div');
     c.className='dc'+(isToday?' today':'')+(sess.length?' done':'');
     if(sess.length)c.style.borderLeftColor=tt.c;
     let body='';
     if(sess.length){
-      sess.forEach(s=>{const st=TT[s.type]||TT.other,bn=S.bikes[s.bike]||s.bike||'';
+      sess.forEach(s=>{const st=getType(s.type),bn=S.bikes[s.bike]||s.bike||'';
         body+=`<span class="dbadge" style="background:${st.c}">${st.e} ${st.l}</span>`;
         if(bn)body+=`<div class="dstat" style="color:${BC[s.bike]||'var(--accent)'};font-size:.63rem">${bn}</div>`;
         if(s.distance)body+=`<div class="dstat">📏 <span>${s.distance} km</span></div>`;
@@ -472,14 +494,16 @@ function driftHTML(s){const dr=hrDrift(s);if(dr===null)return'';
 // ===== MODAL =====
 function openModal(ds,sid=null){
   editId=sid;tmpGPX=null;
-  const d=new Date(ds+'T12:00:00'),dow=d.getDay(),pt=S.plan[dow]||'rest',tt=TT[pt];
+  const d=new Date(ds+'T12:00:00'),dow=d.getDay(),pt=S.plan[dow]||'rest',tt=getType(pt);
   document.getElementById('mTitle').textContent=(sid?'Training bearbeiten':'Training eintragen')+` – ${DN[dow]}, ${d.getDate()}. ${MN[d.getMonth()]}`;
   const hint=document.getElementById('mHint');hint.style.borderLeftColor=tt.c;
   hint.innerHTML=`<strong>${tt.e} Geplant: ${tt.l}</strong><br><span style="color:var(--muted)">${tt.d}</span>`;
   document.querySelector('#mBike option[value="b1"]').textContent='🚴 '+S.bikes.b1;
   document.querySelector('#mBike option[value="b2"]').textContent='🪨 '+S.bikes.b2;
   document.getElementById('mDate').value=ds;
-  document.getElementById('mType').value=pt!=='rest'?pt:'z2';
+  const mTypeEl=document.getElementById('mType');
+  mTypeEl.innerHTML=Object.entries(allTypes()).map(([k,v])=>`<option value="${k}">${v.e} ${v.l}</option>`).join('');
+  mTypeEl.value=pt!=='rest'?pt:'z2';
   document.getElementById('mDir').value='Rückweg';document.getElementById('mBike').value='b1';
   ['mDur','mDist','mAvg','mMax','mHR','mNote'].forEach(id=>document.getElementById(id).value='');
   resetDrop();document.getElementById('hrWarn').style.display='none';
@@ -547,7 +571,7 @@ function renderLog(){
   const sorted=[...S.sessions].sort((a,b)=>b.date.localeCompare(a.date));
   if(!sorted.length){tbl.style.display='none';empty.style.display='block';return}
   tbl.style.display='';empty.style.display='none';
-  body.innerHTML=sorted.map(s=>{const tt=TT[s.type]||TT.other,d=new Date(s.date+'T12:00:00'),bn=S.bikes[s.bike]||'–',e=ef(s);
+  body.innerHTML=sorted.map(s=>{const tt=getType(s.type),d=new Date(s.date+'T12:00:00'),bn=S.bikes[s.bike]||'–',e=ef(s);
     const hrPct=s.hrValidPercent!==null?`<span style="color:${s.hrValidPercent<90?'var(--z3)':'var(--z2)'}">${s.hrValidPercent}%</span>`:'–';
     return`<tr><td>${d.getDate()}. ${MN[d.getMonth()]} ${d.getFullYear()}</td>
       <td style="font-size:.78rem;color:${BC[s.bike]||'inherit'}">${bn}</td><td style="color:var(--muted);font-size:.78rem">${s.direction||'–'}</td>
@@ -577,7 +601,7 @@ function renderStats(){
   const wHR=S.sessions.filter(s=>s.hrSeries&&s.hrSeries.length).sort((a,b)=>b.date.localeCompare(a.date));
   const list=document.getElementById('sessList');
   if(!wHR.length){list.innerHTML='<p style="color:var(--muted);font-size:.79rem;padding:8px">Noch keine Einheiten mit GPX-Daten.</p>';document.getElementById('hrChartW').innerHTML='';document.getElementById('zoneBarW').innerHTML='';document.getElementById('driftW').innerHTML='';document.getElementById('ovToggles').innerHTML='';document.getElementById('elChartW').style.display='none';return}
-  list.innerHTML=wHR.slice(0,8).map((s,i)=>{const d=new Date(s.date+'T12:00:00'),tt=TT[s.type]||TT.other,bn=S.bikes[s.bike]||'';
+  list.innerHTML=wHR.slice(0,8).map((s,i)=>{const d=new Date(s.date+'T12:00:00'),tt=getType(s.type),bn=S.bikes[s.bike]||'';
     return`<div class="sopt${i===0?' on':''}" onclick="selSess(this,'${s.id}')">${tt.e} ${d.getDate()}. ${MN[d.getMonth()]} — ${tt.l}${s.distance?' · '+s.distance+' km':''}${s.heartRate?' · '+s.heartRate+' bpm':''}${bn?' · '+bn:''}</div>`}).join('');
   selSessId(wHR[0].id);
 }
@@ -619,10 +643,10 @@ function renderBikeCmp(){
   document.getElementById('bikeCmp').innerHTML=html;
 }
 function renderCmp(){const body=document.getElementById('cmpBody');let rows='';
-  ['z2','intervals_z3z4','intervals_z4','other'].forEach(t=>{const ss=S.sessions.filter(s=>s.type===t&&s.avgSpeed);if(!ss.length)return;
+  Object.entries(allTypes()).forEach(([t,tt])=>{const ss=S.sessions.filter(s=>s.type===t&&s.avgSpeed);if(!ss.length)return;
     const aSpd=ss.reduce((a,s)=>a+s.avgSpeed,0)/ss.length;
     const hrSS=ss.filter(s=>s.heartRate),aHR=hrSS.length?hrSS.reduce((a,s)=>a+s.heartRate,0)/hrSS.length:null;
-    const efSS=ss.filter(s=>ef(s)!==null),aEF=efSS.length?efSS.reduce((a,s)=>a+ef(s),0)/efSS.length:null;const tt=TT[t];
+    const efSS=ss.filter(s=>ef(s)!==null),aEF=efSS.length?efSS.reduce((a,s)=>a+ef(s),0)/efSS.length:null;
     rows+=`<tr><td><span class="badge" style="background:${tt.c}">${tt.e} ${tt.l}</span></td><td>${ss.length}</td><td>${aSpd.toFixed(1)}</td><td>${aHR?aHR.toFixed(0):'–'}</td><td>${aEF?'<strong>'+aEF.toFixed(1)+'</strong>':'–'}</td></tr>`});
   body.innerHTML=rows||'<tr><td colspan="5" style="color:var(--muted)">Noch keine Daten.</td></tr>';
 }
@@ -683,8 +707,9 @@ function initSettings(){
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
       <span style="width:85px;font-size:.82rem;font-weight:600">${DN[d]}</span>
       <select id="pe_${d}" style="flex:1;background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-family:inherit">
-        ${Object.entries(TT).map(([k,v])=>`<option value="${k}"${S.plan[d]===k?' selected':''}>${v.e} ${v.l}</option>`).join('')}
+        ${Object.entries(allTypes()).map(([k,v])=>`<option value="${k}"${S.plan[d]===k?' selected':''}>${v.e} ${v.l}</option>`).join('')}
       </select></div>`).join('');
+  renderCtypes();
   document.getElementById('hrMaxI').oninput=updateZonePreview;
 }
 function updateZonePreview(){const m=parseInt(document.getElementById('hrMaxI').value)||195;const z2u=Math.round(m*0.75),z3u=Math.round(m*0.85);
@@ -698,7 +723,7 @@ function mergeData(remote){
   (remote.sessions||[]).forEach(rs=>{const ls=map[rs.id];if(!ls||(rs.ts||'')>(ls.ts||''))map[rs.id]=rs});
   const del=new Set([...(S.deleted||[]),...(remote.deleted||[])]);
   S.deleted=[...del];S.sessions=Object.values(map).filter(s=>!del.has(s.id));
-  if((remote.updatedAt||'')>(S.updatedAt||'')){if(remote.plan)S.plan=remote.plan;if(remote.bikes)S.bikes=remote.bikes;if(remote.hrMin)S.hrMin=remote.hrMin;if(remote.hrMax)S.hrMax=remote.hrMax}
+  if((remote.updatedAt||'')>(S.updatedAt||'')){if(remote.plan)S.plan=remote.plan;if(remote.bikes)S.bikes=remote.bikes;if(remote.hrMin)S.hrMin=remote.hrMin;if(remote.hrMax)S.hrMax=remote.hrMax;if(remote.customTypes)S.customTypes=remote.customTypes}
 }
 function onImport(e){const f=e.target.files[0];if(!f)return;
   const r=new FileReader();r.onload=ev=>{try{const data=JSON.parse(ev.target.result);
@@ -780,6 +805,51 @@ function updateAsStatus(){
 }
 function showToast(){const t=document.getElementById('asToast');t.style.opacity='1';clearTimeout(window._t);window._t=setTimeout(()=>t.style.opacity='0',1400)}
 async function initAutoSave(){try{const h=await idbGet();if(h){dirHandle=h;updateAsStatus()}}catch(e){}}
+
+// ===== CUSTOM TYPES =====
+let ctypeEditKey=null;
+function renderCtypes(){
+  const el=document.getElementById('ctypeList');if(!el)return;
+  const entries=Object.entries(S.customTypes||{});
+  if(!entries.length){el.innerHTML='<p style="font-size:.78rem;color:var(--muted);margin-bottom:4px">Noch keine eigenen Typen. Mit dem Button unten erstellen.</p>';return}
+  el.innerHTML=entries.map(([k,v])=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;background:var(--card2);border-radius:8px;padding:9px 12px">
+      <span style="font-size:1.2rem">${v.e}</span>
+      <div style="flex:1"><div style="font-size:.84rem;font-weight:600">${v.l}</div>${v.d?`<div style="font-size:.72rem;color:var(--muted);margin-top:1px">${v.d}</div>`:''}</div>
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${v.c};flex-shrink:0"></span>
+      <button class="btn bs bsm" onclick="showCtypeForm('${k}')">✏️</button>
+      <button class="btn bd bsm" onclick="delCtype('${k}')">🗑</button>
+    </div>`).join('');
+}
+function showCtypeForm(k){
+  ctypeEditKey=k||null;
+  const v=k?(S.customTypes||{})[k]:{e:'🔥',l:'',c:'#ef4444',d:''};
+  document.getElementById('ct_emoji').value=v.e||'🔥';
+  document.getElementById('ct_name').value=v.l||'';
+  document.getElementById('ct_color').value=v.c||'#ef4444';
+  document.getElementById('ct_desc').value=v.d||'';
+  document.getElementById('ctypeForm').style.display='block';
+  document.getElementById('ctypeAddBtn').style.display='none';
+}
+function hideCtypeForm(){
+  document.getElementById('ctypeForm').style.display='none';
+  document.getElementById('ctypeAddBtn').style.display='';
+}
+function saveCtype(){
+  const name=document.getElementById('ct_name').value.trim();
+  if(!name){alert('Bitte einen Namen eingeben.');return}
+  const key=ctypeEditKey||('ct_'+Date.now());
+  if(!S.customTypes)S.customTypes={};
+  S.customTypes[key]={l:name,e:document.getElementById('ct_emoji').value.trim()||'🏋',c:document.getElementById('ct_color').value,d:document.getElementById('ct_desc').value.trim()};
+  save();renderCtypes();hideCtypeForm();
+}
+function delCtype(k){
+  if(!confirm('Diesen Trainingstyp löschen? Tage im Wochenplan, die diesen Typ verwenden, werden auf "Ruhetag" gesetzt.'))return;
+  if(!S.customTypes)return;
+  delete S.customTypes[k];
+  Object.keys(S.plan).forEach(d=>{if(S.plan[d]===k)S.plan[d]='rest'});
+  save();renderCtypes();initSettings();
+}
 
 // ===== PWA =====
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
