@@ -2,6 +2,7 @@
   "name": "Fahrrad Trainingsplan",
   "short_name": "Trainingsplan",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#0d0f18",
   "theme_color": "#0d0f18",
@@ -9,13 +10,13 @@
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
   "share_target": {
-    "action": "/Fahrradtrainer/share",
+    "action": "./share",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
       "files": [{
         "name": "gpx",
-        "accept": ["application/gpx+xml", ".gpx"]
+        "accept": ["application/gpx+xml", ".gpx", "application/xml", "text/xml"]
       }]
     }
   }

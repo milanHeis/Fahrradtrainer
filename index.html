@@ -781,14 +781,33 @@ function updateAsStatus(){
 function showToast(){const t=document.getElementById('asToast');t.style.opacity='1';clearTimeout(window._t);window._t=setTimeout(()=>t.style.opacity='0',1400)}
 async function initAutoSave(){try{const h=await idbGet();if(h){dirHandle=h;updateAsStatus()}}catch(e){}}
 
+async function handleSharedGpx(){
+  const params=new URLSearchParams(location.search);
+  if(params.get('gpx_shared')!=='1')return;
+  try{
+    const cache=await caches.open('gpx-share');
+    const res=await cache.match('/_gpx_share');
+    if(!res)return;
+    const blob=await res.blob();
+    const filename=decodeURIComponent(res.headers.get('X-Filename')||'shared.gpx');
+    const file=new File([blob],filename,{type:res.headers.get('Content-Type')||blob.type||'application/gpx+xml'});
+    let targetDate=fmt(new Date());
+    try{targetDate=parseGPX(await file.text()).date}catch(e){}
+    openModal(targetDate);
+    processGPX(file);
+    await cache.delete('/_gpx_share');
+    history.replaceState(null,'',location.pathname);
+  }catch(e){console.warn('Shared GPX import failed:',e)}
+}
+
 // ===== PWA =====
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
 
 // ===== INIT =====
 loadLS();
 const now=new Date();
 document.getElementById('hDate').textContent=`${DN[now.getDay()]}, ${now.getDate()}. ${MN[now.getMonth()]} ${now.getFullYear()}`;
-updateAsStatus();updateSyncStatus();renderWeek();initAutoSave();initSync();
+updateAsStatus();updateSyncStatus();renderWeek();initAutoSave();initSync();handleSharedGpx();
 </script>
 </body>
 </html>
