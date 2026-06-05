@@ -95,6 +95,14 @@ tr:hover td{background:var(--card2)}
 .bk-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px}
 .bk-row span:first-child{color:var(--muted);font-size:.72rem}
 .bk-row span:last-child{font-weight:700}
+.nutr-phases{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px;margin-bottom:16px}
+.nutr-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+.nutr-card h4{font-weight:700;font-size:.88rem;margin-bottom:8px}
+.nutr-row{display:flex;align-items:baseline;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+.nutr-row:last-of-type{border-bottom:none}
+.nutr-val{font-size:1.05rem;font-weight:700;color:var(--accent)}
+.nutr-unit{font-size:.72rem;color:var(--muted)}
+.nutr-hint{font-size:.68rem;color:var(--muted);margin-top:7px;line-height:1.45;padding-top:6px;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -104,12 +112,14 @@ tr:hover td{background:var(--card2)}
     <span id="syncInd" style="display:none">☁ <span id="syncLbl"></span></span>
     <span id="asInd" title="Datei-Auto-Save"><span class="as-dot" id="asDot"></span> <span id="asLbl">localStorage</span></span>
     <span id="hDate"></span>
+    <span id="appVer" style="font-size:.65rem;color:var(--muted);opacity:.5"></span>
   </div>
 </div>
 <div class="tabs">
   <div class="tb on" onclick="tab('week')">📅 Woche</div>
   <div class="tb" onclick="tab('log')">📋 Protokoll</div>
   <div class="tb" onclick="tab('stats')">📊 Auswertung</div>
+  <div class="tb" onclick="tab('nutrition')">🥤 Ernährung</div>
   <div class="tb" onclick="tab('settings')">⚙️ Einstellungen</div>
 </div>
 <div class="pg">
@@ -147,7 +157,7 @@ tr:hover td{background:var(--card2)}
       <canvas id="cDist" height="110"></canvas>
     </div>
     <div class="cbox"><h3>📈 Z2-Effizienz-Trend (EF)</h3>
-      <div class="csub">EF = Ø Geschwindigkeit ÷ Ø HF × 100, nur Z2-Fahrten. Steigt die Linie, wird deine aerobe Grundlage besser.</div>
+      <div class="csub">EF = Ø Geschwindigkeit ÷ Ø HF × 100, nur Z2-Fahrten mit ≥ 80 % gültigen HF-Werten. Steigt die Linie, wird deine aerobe Grundlage besser.</div>
       <canvas id="cEF" height="140"></canvas>
     </div>
     <div class="cbox"><h3>🚴 Fahrrad-Vergleich (Z2)</h3>
@@ -167,6 +177,61 @@ tr:hover td{background:var(--card2)}
       <div id="zoneBarW" style="margin-top:8px"></div>
       <div id="driftW" style="margin-top:8px"></div>
       <div id="elChartW" class="cwrap" style="margin-top:8px;display:none"></div>
+    </div>
+  </div>
+
+  <div id="v-nutrition" class="vw">
+    <div class="sset"><h3>⚙️ Profil</h3>
+      <p>Körpergewicht und Schweißrate beeinflussen die Empfehlungen für Flüssigkeit und Natrium.</p>
+      <div class="fr">
+        <div class="fg"><label>Körpergewicht (kg)</label><input type="number" id="ncWeight" min="40" max="150" placeholder="75"></div>
+        <div class="fg"><label>Schweißrate (geschätzt)</label>
+          <select id="ncSweat">
+            <option value="low">Niedrig (~0,5 L/h)</option>
+            <option value="med">Mittel (~1,0 L/h)</option>
+            <option value="high">Hoch (~1,5 L/h)</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn bp bsm" onclick="saveNutrition()">💾 Speichern</button>
+    </div>
+    <div class="sset"><h3>🧮 Einheiten-Rechner</h3>
+      <p>Optimale Kohlenhydrat-, Flüssigkeits- und Elektrolytzufuhr für eine Trainingseinheit.</p>
+      <div class="fr">
+        <div class="fg"><label>Trainingstyp</label>
+          <select id="ncType">
+            <option value="z2">🟢 Z2 Locker</option>
+            <option value="intervals_z3z4">🟡 4×6 Z3–Z4</option>
+            <option value="intervals_z4">🔴 2×10 Z4</option>
+          </select>
+        </div>
+        <div class="fg"><label>Dauer (Minuten)</label><input type="number" id="ncDur" min="10" max="360" placeholder="60"></div>
+      </div>
+      <div class="fg"><label>Temperatur / Bedingungen</label>
+        <select id="ncCond">
+          <option value="cool">❄️ Kühl (&lt;15°C)</option>
+          <option value="normal" selected>🌤 Normal (15–25°C)</option>
+          <option value="hot">☀️ Heiß (&gt;25°C)</option>
+        </select>
+      </div>
+      <button class="btn bp bsm" onclick="calcNutrition()">▶ Berechnen</button>
+    </div>
+    <div id="ncResult"></div>
+    <div class="sset"><h3>📅 Wochenübersicht</h3>
+      <p>Gesamtbedarf der geplanten Trainingswoche basierend auf einer typischen Einheitendauer.</p>
+      <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div class="fg" style="margin:0;flex:0 0 180px"><label>Typische Dauer (Min)</label><input type="number" id="ncTypDur" min="10" max="180" placeholder="60"></div>
+        <button class="btn bs bsm" onclick="renderNutrWeek()">Berechnen</button>
+      </div>
+      <div id="ncWeekResult"></div>
+    </div>
+    <div class="sset"><h3>📚 Wissenschaftliche Grundlage</h3>
+      <div style="font-size:.78rem;color:var(--muted);line-height:1.65">
+        <p><strong style="color:var(--text)">Kohlenhydrate:</strong> Thomas et al. (2016), Burke et al. (2011) – 30–90 g/h je nach Intensität &amp; Dauer. Bei &gt;60 g/h: Glukose+Fruktose 2:1 nötig (ISSN Position Stand 2021). Z2-Kurzeinheiten (&lt;75 min): gezielt kohlenhydratarm trainieren kann die Fettoxidation verbessern.</p>
+        <p style="margin-top:6px"><strong style="color:var(--text)">Flüssigkeit:</strong> Sawka et al. (2007) ACSM Position Stand – Ziel: 75–80 % des Schweißverlusts ersetzen; Richtwert 500–1000 mL/h; trinke nach Durst (kein Überhydrieren, Hyponatriämie-Risiko).</p>
+        <p style="margin-top:6px"><strong style="color:var(--text)">Natrium:</strong> Wichtigstes Elektrolyt während des Trainings; verhindert Hyponatriämie, hält Durst aufrecht. Verlust: 460–1840 mg/L Schweiß (stark individuell). Stearns et al. (2017).</p>
+        <p style="margin-top:6px"><strong style="color:var(--text)">Regeneration:</strong> 0,8–1,2 g/kg Kohlenhydrate + 20–40 g Protein innerhalb 30 min für optimale Glykogenresynthese &amp; Muskelproteinsynthese (Churchward-Venne et al. 2012). Rehydrierung: ~1,5× Flüssigkeitsverlust (Stellingwerff et al. 2011).</p>
+      </div>
     </div>
   </div>
 
@@ -274,10 +339,11 @@ const TT={
 const DN=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 const MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const BC={b1:'#5c8eff',b2:'#34d058'};
+const APP_VERSION='1.1.0';
 
 let S={plan:{0:'rest',1:'rest',2:'z2',3:'z2',4:'intervals_z3z4',5:'intervals_z4',6:'rest'},
   bikes:{b1:'Tracking-Bike',b2:'Gravelbike'},hrMin:80,hrMax:195,sessions:[],deleted:[],updatedAt:'',
-  gistToken:'',gistId:''};
+  gistToken:'',gistId:'',nutrition:{weight:null,sweat:'med'}};
 let wkOff=0,editId=null,tmpGPX=null,statPeriod='week',dirHandle=null,asPending=false,curSessId=null,overlays={speed:false,alt:false},pushTimer=null;
 
 // ===== STORAGE =====
@@ -298,7 +364,7 @@ function kw(d){const a=new Date(d);a.setHours(12);a.setDate(a.getDate()+4-(a.get
 
 // ===== METRICS =====
 function zones(){const m=S.hrMax||195;return{z2u:Math.round(m*0.75),z3u:Math.round(m*0.85)}}
-function ef(s){return s.avgSpeed&&s.heartRate?Math.round(s.avgSpeed/s.heartRate*100*10)/10:null}
+function ef(s){if(s.hrValidPercent!==null&&s.hrValidPercent<80)return null;return s.avgSpeed&&s.heartRate?Math.round(s.avgSpeed/s.heartRate*100*10)/10:null}
 function hrDrift(s){if(!s.hrSeries)return null;const v=s.hrSeries.filter(p=>p.v);if(v.length<6)return null;
   const m=Math.floor(v.length/2);const a1=v.slice(0,m).reduce((a,p)=>a+p.hr,0)/m;const a2=v.slice(m).reduce((a,p)=>a+p.hr,0)/(v.length-m);
   return Math.round((a2-a1)/a1*1000)/10}
@@ -307,9 +373,9 @@ function timeInZones(s){if(!s.hrSeries)return null;const v=s.hrSeries.filter(p=>
   const t=v.length;return{low:Math.round(lo/t*100),mid:Math.round(mi/t*100),high:Math.round(hi/t*100)}}
 
 // ===== TABS =====
-function tab(t){document.querySelectorAll('.tb').forEach((el,i)=>el.classList.toggle('on',['week','log','stats','settings'][i]===t));
+function tab(t){document.querySelectorAll('.tb').forEach((el,i)=>el.classList.toggle('on',['week','log','stats','nutrition','settings'][i]===t));
   document.querySelectorAll('.vw').forEach(v=>v.classList.remove('on'));document.getElementById('v-'+t).classList.add('on');
-  if(t==='stats')renderStats();if(t==='log')renderLog();if(t==='settings')initSettings();}
+  if(t==='stats')renderStats();if(t==='log')renderLog();if(t==='settings')initSettings();if(t==='nutrition')renderNutrition();}
 
 // ===== WEEK =====
 function wk(d){wkOff+=d;renderWeek()}
@@ -672,6 +738,117 @@ function drawEF(id){
   ['b1','b2'].forEach(bk=>{if(!z2All.some(s=>(s.bike||'b1')===bk))return;ctx.fillStyle=BC[bk];ctx.fillRect(lx,8,10,3);ctx.fillStyle='#e2e4f0';ctx.fillText(S.bikes[bk],lx+13,12);lx+=ctx.measureText(S.bikes[bk]).width+30});
 }
 
+// ===== NUTRITION =====
+function renderNutrition(){
+  const n=S.nutrition||{};
+  if(n.weight)document.getElementById('ncWeight').value=n.weight;
+  document.getElementById('ncSweat').value=n.sweat||'med';
+  const active=S.sessions.filter(s=>s.type&&s.type!=='rest').slice(-10);
+  if(active.length){
+    document.getElementById('ncType').value=active[active.length-1].type||'z2';
+    const durs=active.map(s=>s.durationSec).filter(Boolean);
+    if(durs.length){const avg=Math.round(durs.reduce((a,d)=>a+d,0)/durs.length/60);
+      document.getElementById('ncDur').value=avg;document.getElementById('ncTypDur').value=avg;}}
+  if(!document.getElementById('ncDur').value)document.getElementById('ncDur').value=60;
+  if(!document.getElementById('ncTypDur').value)document.getElementById('ncTypDur').value=60;
+  document.getElementById('ncResult').innerHTML='';
+  document.getElementById('ncWeekResult').innerHTML='';
+}
+function saveNutrition(){
+  if(!S.nutrition)S.nutrition={};
+  S.nutrition.weight=parseInt(document.getElementById('ncWeight').value)||null;
+  S.nutrition.sweat=document.getElementById('ncSweat').value||'med';
+  save();showToast();
+}
+function nutrVals(type,durMin,cond,wt,sweat){
+  const durH=durMin/60;
+  const isInt=type!=='z2',isHigh=type==='intervals_z4';
+  const isHot=cond==='hot',isCool=cond==='cool';
+  let carbsH;
+  if(durMin<45)carbsH=0;
+  else if(durMin<75)carbsH=isHigh?45:isInt?35:20;
+  else if(durMin<120)carbsH=isHigh?65:isInt?55:40;
+  else if(durMin<180)carbsH=isHigh?80:isInt?70:55;
+  else carbsH=isHigh?90:isInt?85:70;
+  const sweatBase={low:500,med:750,high:1000}[sweat]||750;
+  let waterH=isHot?Math.min(Math.round(sweatBase*1.3),1200):isCool?Math.round(sweatBase*0.85):sweatBase;
+  if(isInt)waterH=Math.min(Math.round(waterH*1.1),1100);
+  let sodH=isHot?800:isCool?300:500;
+  if(isInt)sodH=Math.round(sodH*1.15);
+  const preCKg=durMin<60?(isInt?1.5:1):(isInt?2.5:1.5);
+  const postCKg=isInt?1.2:0.8;
+  const w=wt||75;
+  return{durMin,durH,type,cond,wt:w,
+    carbsH,carbsDur:Math.round(carbsH*durH),
+    waterH,waterDur:Math.round(waterH*durH),
+    sodH,sodDur:Math.round(sodH*durH),
+    preCKg,preCarbs:Math.round(preCKg*w),
+    postCKg,postCarbs:Math.round(postCKg*w),postProt:20,
+    multiT:carbsH>60};
+}
+function calcNutrition(){
+  const v=nutrVals(
+    document.getElementById('ncType').value,
+    parseInt(document.getElementById('ncDur').value)||60,
+    document.getElementById('ncCond').value,
+    S.nutrition&&S.nutrition.weight?S.nutrition.weight:null,
+    (S.nutrition&&S.nutrition.sweat)||'med');
+  document.getElementById('ncResult').innerHTML=nutrHTML(v);
+}
+function nutrHTML(v){
+  const tl={z2:'Z2 Locker',intervals_z3z4:'4×6 Z3–Z4',intervals_z4:'2×10 Z4'}[v.type]||v.type;
+  const cl={hot:'Heiß >25°C',cool:'Kühl <15°C',normal:'Normal 15–25°C'}[v.cond]||v.cond;
+  const nr=(ic,lb,val,note)=>`<div class="nutr-row"><span style="font-size:.82rem">${ic} ${lb}</span>`+
+    `<div style="text-align:right"><span class="nutr-val">${val}</span>`+
+    `${note?`<div style="font-size:.67rem;color:var(--muted)">${note}</div>`:''}</div></div>`;
+  const card=(ttl,body,hint)=>`<div class="nutr-card"><h4>${ttl}</h4>${body}`+
+    `${hint?`<div class="nutr-hint">${hint}</div>`:''}</div>`;
+  const pre=card('⏰ Vor dem Training',
+    nr('🍞','Kohlenhydrate',v.preCarbs+' g',v.preCKg+' g/kg – Reis, Nudeln, Hafer')+
+    nr('💧','Wasser','300 mL','zum Essen trinken'),
+    '3–4 h vor dem Start. Optional 1 h vorher: 30–60 g schnelle Kohlenhydrate.');
+  const during=card('🚴 Während',
+    nr('🍌','Kohlenhydrate',v.carbsH>0?v.carbsH+' g/h':'nicht nötig',v.carbsDur>0?'~ '+v.carbsDur+' g gesamt':'')+
+    nr('💧','Wasser',v.waterH+' mL/h','~ '+(v.waterDur/1000).toFixed(1)+' L gesamt')+
+    nr('🧂','Natrium',v.sodH+' mg/h','~ '+v.sodDur+' mg gesamt'),
+    v.multiT?'⚠ Bei >60 g/h: Glukose + Fruktose im Verhältnis 2:1 verwenden (Sportgetränk + Gels mit Fruktose).':'');
+  const postWater=Math.min(Math.round(v.waterH*0.5),500);
+  const post=card('🏁 Nach dem Training',
+    nr('🍌','Kohlenhydrate',v.postCarbs+' g',v.postCKg+' g/kg – schnelle Carbs')+
+    nr('🥛','Protein',v.postProt+' g','Quark, Milch, Hüttenkäse, Shake')+
+    nr('💧','Wasser','≥ '+postWater+' mL','erste 30 min, danach weiter trinken'),
+    'Innerhalb 30 min nach dem Training für optimale Regeneration.');
+  return`<div class="note" style="margin-bottom:10px">📊 ${tl} · ${v.durMin} min · ${cl} · ${v.wt} kg</div>`+
+    `<div class="nutr-phases">${pre}${during}${post}</div>`;
+}
+function renderNutrWeek(){
+  const dur=parseInt(document.getElementById('ncTypDur').value)||60;
+  const wt=(S.nutrition&&S.nutrition.weight)||75;
+  const sw=(S.nutrition&&S.nutrition.sweat)||'med';
+  let rows='',tC=0,tW=0,tS=0;
+  [1,2,3,4,5,6,0].forEach(dow=>{
+    const type=S.plan[dow]||'rest';
+    if(type==='rest'){rows+=`<tr><td>${DN[dow]}</td><td colspan="3" style="color:var(--muted);font-size:.78rem">Ruhetag</td></tr>`;return}
+    const v=nutrVals(type,dur,'normal',wt,sw);
+    const postW=Math.min(Math.round(v.waterH*0.5),500);
+    const dayC=v.preCarbs+v.carbsDur+v.postCarbs;
+    const dayW=300+v.waterDur+postW;
+    tC+=dayC;tW+=dayW;tS+=v.sodDur;
+    const tt=TT[type]||TT.other;
+    rows+=`<tr><td><span class="badge" style="background:${tt.c};font-size:.68rem">${tt.e}</span> ${DN[dow]}</td>`+
+      `<td>${dayC} g</td><td>${(dayW/1000).toFixed(1)} L</td><td>${v.sodDur} mg</td></tr>`;
+  });
+  document.getElementById('ncWeekResult').innerHTML=`<div class="tbl-w"><table>`+
+    `<thead><tr><th>Tag</th><th>Kohlenhydrate</th><th>Wasser</th><th>Natrium</th></tr></thead>`+
+    `<tbody>${rows}</tbody>`+
+    `<tfoot><tr><td style="font-weight:700;padding:9px 11px">Gesamt / Woche</td>`+
+    `<td style="font-weight:700;color:var(--accent)">${tC} g</td>`+
+    `<td style="font-weight:700;color:var(--accent)">${(tW/1000).toFixed(1)} L</td>`+
+    `<td style="font-weight:700;color:var(--accent)">${tS} mg</td></tr></tfoot>`+
+    `</table></div>`+
+    `<div style="font-size:.7rem;color:var(--muted);margin-top:6px">Basis: ${dur} min Einheit, ${wt} kg, normale Bedingungen. Ruhetage ohne Trainingsbedarf.</div>`;
+}
+
 // ===== SETTINGS =====
 function initSettings(){
   document.getElementById('b1n').value=S.bikes.b1;document.getElementById('b2n').value=S.bikes.b2;
@@ -698,7 +875,7 @@ function mergeData(remote){
   (remote.sessions||[]).forEach(rs=>{const ls=map[rs.id];if(!ls||(rs.ts||'')>(ls.ts||''))map[rs.id]=rs});
   const del=new Set([...(S.deleted||[]),...(remote.deleted||[])]);
   S.deleted=[...del];S.sessions=Object.values(map).filter(s=>!del.has(s.id));
-  if((remote.updatedAt||'')>(S.updatedAt||'')){if(remote.plan)S.plan=remote.plan;if(remote.bikes)S.bikes=remote.bikes;if(remote.hrMin)S.hrMin=remote.hrMin;if(remote.hrMax)S.hrMax=remote.hrMax}
+  if((remote.updatedAt||'')>(S.updatedAt||'')){if(remote.plan)S.plan=remote.plan;if(remote.bikes)S.bikes=remote.bikes;if(remote.hrMin)S.hrMin=remote.hrMin;if(remote.hrMax)S.hrMax=remote.hrMax;if(remote.nutrition)S.nutrition=remote.nutrition}
 }
 function onImport(e){const f=e.target.files[0];if(!f)return;
   const r=new FileReader();r.onload=ev=>{try{const data=JSON.parse(ev.target.result);
@@ -807,6 +984,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
 loadLS();
 const now=new Date();
 document.getElementById('hDate').textContent=`${DN[now.getDay()]}, ${now.getDate()}. ${MN[now.getMonth()]} ${now.getFullYear()}`;
+document.getElementById('appVer').textContent='v'+APP_VERSION;
 updateAsStatus();updateSyncStatus();renderWeek();initAutoSave();initSync();handleSharedGpx();
 </script>
 </body>
