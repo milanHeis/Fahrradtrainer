@@ -16,7 +16,7 @@
     "params": {
       "files": [{
         "name": "gpx",
-        "accept": ["application/gpx+xml", ".gpx", "application/xml", "text/xml"]
+        "accept": ["application/gpx+xml", ".gpx", "application/xml", "text/xml", "application/octet-stream"]
       }]
     }
   }
